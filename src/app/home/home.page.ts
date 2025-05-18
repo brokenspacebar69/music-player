@@ -1,29 +1,16 @@
+// Path: src/app/home/home.page.ts
+
 import { HttpClient } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
-import { Howl } from 'howler';
-import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
-import { App } from '@capacitor/app';
+import { DomSanitizer } from '@angular/platform-browser';
 import { Platform } from '@ionic/angular';
-
-// Manual inline module declaration for capacitor-file-picker
-declare module 'capacitor-file-picker' {
-  export interface FilePickerResult {
-    files?: Array<{
-      name: string;
-      path?: string;
-      webPath?: string;
-    }>;
-    documents?: Array<{
-      name: string;
-      path?: string;
-      webPath?: string;
-    }>;
-  }
-}
-
-import { FilePicker } from 'capacitor-file-picker';
-declare var jsmediatags: any;
+import { FilePickerService } from '../services/file-picker.service';
+import { StorageService } from '../services/storage.service';
+import { LocalMusicService } from '../services/local-music.service';
+import { PlayerService } from '../services/player.service';
+import { SpotifyService } from '../services/spotify.service';
+import { Track } from '../models/track.model';
 
 @Component({
   selector: 'app-home',
@@ -32,145 +19,237 @@ declare var jsmediatags: any;
   standalone: false,
 })
 export class HomePage {
-  sound: Howl | undefined;
-  selectedFileName?: string;
-  searchQuery: string = '';
+  searchQuery = '';
   searchResults: any[] = [];
   isSearching = false;
-  currentTrackImage: SafeUrl | string = 'assets/placeholder.png';
-  currentTrack: { title: string; artist: string; image: string } | null = null;
+  currentTrack: Track | null = null;
+  favorites: Track[] = [];
+  playlist: Track[] = [];
+  uploadedTracks: Track[] = [];
+  isPlaying = false;
+  showPlaylist = false;
 
   constructor(
     private http: HttpClient,
     private sanitizer: DomSanitizer,
-    private platform: Platform
+    private platform: Platform,
+    private filePickerService: FilePickerService,
+    private storageService: StorageService,
+    private localMusicService: LocalMusicService,
+    private playerService: PlayerService,
+    private spotifyService: SpotifyService
   ) {
-    this.initializeAppStateListeners();
-  }
+    this.loadUploadedTracks();
+    this.loadPlaylist(); 
 
-  initializeAppStateListeners() {
-    App.addListener('pause', () => {
-      this.sound?.pause();
+    this.playerService.currentTrack$.subscribe(track => {
+      this.currentTrack = track;
     });
 
-    if (this.platform.is('android')) {
-      App.addListener('backButton', () => {
-        if (this.sound?.playing()) {
-          this.sound.pause();
-        } else {
-          App.exitApp();
-        }
-      });
-    }
-  }
-
-  async pickAudioFile() {
-    if (Capacitor.getPlatform() === 'web') {
-      document.getElementById('fileInput')?.click();
-    } else {
-      try {
-        const result = await FilePicker.showFilePicker({ fileTypes: ['audio/*'] });
-        const files = result.files || result.documents || [];
-        if (files.length > 0) {
-          const file = files[0];
-          this.selectedFileName = file.name;
-          const fileUrl = file.path || file.webPath;
-          if (fileUrl) {
-            this.playAudio(fileUrl);
-            this.currentTrack = {
-              title: file.name,
-              artist: 'Local File',
-              image: 'assets/placeholder.png',
-            };
-          } else {
-            alert('File path is not available on this platform.');
-          }
-        }
-      } catch (error) {
-        console.error('Error picking audio file:', error);
-      }
-    }
-  }
-
-  onFileSelected(event: any) {
-    const file = event.target.files[0];
-    if (file) {
-      this.selectedFileName = file.name;
-      const fileUrl = URL.createObjectURL(file);
-      this.readAudioMetadata(file);
-      this.playAudio(fileUrl);
-    }
-  }
-
-  readAudioMetadata(file: File) {
-    jsmediatags.read(file, {
-      onSuccess: (tag: any) => {
-        const title = tag.tags.title || file.name;
-        const artist = tag.tags.artist || 'Unknown Artist';
-        let imageUrl = 'assets/placeholder.png';
-        if (tag.tags.picture) {
-          const { data, format } = tag.tags.picture;
-          const byteArray = new Uint8Array(data);
-          const blob = new Blob([byteArray], { type: format });
-          imageUrl = URL.createObjectURL(blob);
-        }
-        this.currentTrack = { title, artist, image: imageUrl };
-      },
-      onError: () => {
-        this.currentTrack = { title: file.name, artist: 'Unknown Artist', image: 'assets/placeholder.png' };
-      },
+    this.playerService.isPlaying$.subscribe(val => {
+      this.isPlaying = val;
     });
+  }
+
+  private async loadUploadedTracks() {
+    try {
+      this.uploadedTracks = await this.storageService.getUploadedTracks();
+    } catch (error) {
+      console.error('Error loading uploaded tracks:', error);
+    }
+  }
+
+  private async loadPlaylist() {
+    try {
+      this.playlist = await this.storageService.getPlaylists() || [];
+    } catch (error) {
+      console.error('Error loading playlist:', error);
+    }
+  }
+
+  private async loadStorageData() {
+    try {
+      this.favorites = await this.storageService.getFavorites() || [];
+      this.playlist = await this.storageService.getPlaylists() || [];
+    } catch (error) {
+      console.error('Error loading storage data:', error);
+    }
+  }
+
+  async pickAudioFile(event: any) {
+    const newTrack = await this.filePickerService.onFileSelected(event);
+    if (newTrack) {
+      this.uploadedTracks = [newTrack, ...this.uploadedTracks];
+
+      await this.storageService.setUploadedTracks(this.uploadedTracks);
+    }
+  }
+
+  async searchMusic() {
+    if (!this.searchQuery.trim()) {
+      this.searchResults = [];
+      return;
+    }
+
+    this.isSearching = true;
+    try {
+      const results = await this.spotifyService.searchTracks(this.searchQuery);
+      this.searchResults = results
+        .filter(track => !!track.preview_url)
+        .map(track => ({
+          title: track.name,
+          artist: { name: track.artists[0]?.name },
+          album: {
+            title: track.album.name,
+            cover_medium: track.album.images?.[1]?.url || 'assets/placeholder.png',
+            id: track.album.id,
+          },
+          artistId: track.artists[0]?.id,
+          preview: track.preview_url,
+        }));
+    } catch (error) {
+      console.error('Spotify search error:', error);
+    } finally {
+      this.isSearching = false;
+    }
+  }
+
+  playStream(track: any) {
+    const previewUrl = track.preview;
+    if (!previewUrl) {
+      alert('Preview not available for this track');
+      return;
+    }
+
+    const image = track.album?.cover_medium || track.artist?.picture_medium || 'assets/placeholder.png';
+
+    const metaTrack: Track = {
+      title: track.title,
+      artist: track.artist.name,
+      album: track.album.title,
+      albumId: track.album.id,
+      artistId: track.artist.id,
+      image,
+      fileUrl: previewUrl,
+      isLocal: false,
+    };
+
+    this.playerService.play(metaTrack);
+    this.currentTrack = metaTrack;
   }
 
   playAudio(fileUrl?: string) {
     if (fileUrl) {
-      this.sound?.unload();
-      this.sound = new Howl({ src: [fileUrl], html5: true });
-      this.sound.play();
-    } else {
-      this.sound?.play();
+      const track = this.playlist.find(t => t.fileUrl === fileUrl) || this.uploadedTracks.find(t => t.fileUrl === fileUrl);
+      if (track) {
+        this.currentTrack = track; 
+        this.playerService.play(track);
+      }
+    } else if (this.currentTrack?.fileUrl) {
+      this.playerService.play(this.currentTrack);
     }
   }
 
   pauseAudio() {
-    this.sound?.pause();
+    this.playerService.pause();
   }
 
   stopAudio() {
-    this.sound?.stop();
+    this.playerService.stop();
   }
 
-  searchMusic() {
-    if (!this.searchQuery.trim()) return;
-    this.isSearching = true;
-    const url = `https://api.deezer.com/search?q=${encodeURIComponent(this.searchQuery)}`;
-    const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-    this.http.get(proxyUrl).subscribe(
-      (response: any) => {
-        this.searchResults = response.data || [];
-        this.isSearching = false;
-      },
-      (error) => {
-        console.error('Search error:', error);
-        this.isSearching = false;
-      }
-    );
-  }
-
-  playStream(track: any) {
-    this.sound?.unload();
-    const previewUrl = track.preview;
-    if (previewUrl) {
-      this.selectedFileName = `${track.title} - ${track.artist.name}`;
-      this.sound = new Howl({ src: [previewUrl], html5: true });
-      this.sound.play();
-      this.currentTrack = {
-        title: track.title,
-        artist: track.artist.name,
-        image: track.album.cover_medium || 'assets/placeholder.png',
-      };
+  toggleMiniPlayerPlay() {
+    if (this.isPlaying) {
+      this.playerService.pause(); 
     } else {
-      alert('Preview not available for this track');
+      this.playerService.resume(); 
+    }
+  }
+
+  openFullPlayer() {
+    const card = document.querySelector('ion-card');
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async addToPlaylist(track: Track) {
+    const exists = this.playlist.some(t => t.fileUrl === track.fileUrl);
+    if (!exists) {
+      this.playlist = [track, ...this.playlist];
+      await this.storageService.setPlaylists(this.playlist); 
+    }
+  }
+
+  deleteFromPlaylist(index: number) {
+    try {
+      
+      this.playlist.splice(index, 1);
+     
+      this.storageService.setPlaylists(this.playlist);
+
+      console.log('Track removed from playlist:', this.playlist);
+    } catch (error) {
+      console.error('Error removing track from playlist:', error);
+    }
+  }
+
+  togglePlaylistView() {
+    this.showPlaylist = !this.showPlaylist;
+  }
+
+  triggerFileInput() {
+    const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  }
+
+  playPreviousSong() {
+    if (!this.currentTrack || this.playlist.length === 0) {
+      console.log('No previous song available.');
+      return;
+    }
+
+    const currentIndex = this.playlist.findIndex(track => track.fileUrl === this.currentTrack?.fileUrl);
+    if (currentIndex > 0) {
+      const previousTrack = this.playlist[currentIndex - 1];
+      console.log('Playing previous track:', previousTrack);
+      this.currentTrack = previousTrack;
+      this.playAudio(previousTrack.fileUrl);
+    } else {
+      console.log('No previous song available.');
+    }
+  }
+
+  playNextSong() {
+    if (!this.currentTrack || this.playlist.length === 0) {
+      console.log('No next song available.');
+      return;
+    }
+
+    const currentIndex = this.playlist.findIndex(track => track.fileUrl === this.currentTrack?.fileUrl);
+    if (currentIndex < this.playlist.length - 1) {
+      const nextTrack = this.playlist[currentIndex + 1];
+      console.log('Playing next track:', nextTrack);
+      this.currentTrack = nextTrack;
+      this.playAudio(nextTrack.fileUrl);
+    } else {
+      console.log('No next song available.');
+    }
+  }
+
+  async deleteUploadedTrack(index: number) {
+    try {
+      const trackToDelete = this.uploadedTracks[index];
+      this.uploadedTracks.splice(index, 1);
+
+      await this.storageService.setUploadedTracks(this.uploadedTracks);
+      console.log('Track deleted from uploadedTracks:', trackToDelete);
+      this.playlist = this.playlist.filter(track => track.fileUrl !== trackToDelete.fileUrl);
+      await this.storageService.setPlaylists(this.playlist);
+
+      console.log('Track removed from playlist if it existed:', trackToDelete);
+    } catch (error) {
+      console.error('Error deleting track:', error);
     }
   }
 }

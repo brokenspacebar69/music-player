@@ -1,5 +1,7 @@
+// Path: src/app/services/storage.service.ts
 import { Injectable } from '@angular/core';
 import { Storage } from '@ionic/storage-angular';
+import { Track } from '../models/track.model';
 
 @Injectable({ providedIn: 'root' })
 export class StorageService {
@@ -7,27 +9,33 @@ export class StorageService {
     this.storage.create();
   }
 
-  async getSearchHistory(): Promise<string[]> {
-    return (await this.storage.get('searchHistory')) || [];
-  }
-
-  async setSearchHistory(history: string[]): Promise<void> {
-    await this.storage.set('searchHistory', history);
-  }
-
   async getFavorites(): Promise<any[]> {
     return (await this.storage.get('favorites')) || [];
   }
 
-  async setFavorites(favorites: any[]): Promise<void> {
-    await this.storage.set('favorites', favorites);
+  async setFavorites(data: any[]): Promise<void> {
+    await this.storage.set('favorites', data);
   }
 
-  async getPlaylists(): Promise<any[]> {
-    return (await this.storage.get('playlists')) || [];
+  async getPlaylists(): Promise<Track[]> {
+    return (await this.storage.get('playlist')) || [];
   }
 
-  async setPlaylists(playlists: any[]): Promise<void> {
-    await this.storage.set('playlists', playlists);
+  async setPlaylists(data: Track[]): Promise<void> {
+    try {
+      await this.storage.set('playlist', data);
+      console.log('Playlist saved to storage:', data);
+    } catch (error) {
+      console.error('Error saving playlist to storage:', error);
+    }
+  }
+
+  async getUploadedTracks(): Promise<Track[]> {
+    return (await this.storage.get('uploadedTracks')) || [];
+  }
+
+  async setUploadedTracks(data: Track[]): Promise<void> {
+    await this.storage.set('uploadedTracks', data);
   }
 }
+

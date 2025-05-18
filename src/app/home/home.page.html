@@ -5,8 +5,10 @@
 </ion-header>
 
 <ion-content>
+  <!-- Spotify Search -->
   <ion-searchbar [(ngModel)]="searchQuery" (ionInput)="searchMusic()" placeholder="Search songs..."></ion-searchbar>
 
+  <!-- Spotify Search Results -->
   <ion-list *ngIf="searchResults.length > 0">
     <ion-item *ngFor="let track of searchResults" (click)="playStream(track)">
       <ion-thumbnail slot="start">
@@ -19,19 +21,84 @@
     </ion-item>
   </ion-list>
 
-  <ion-button (click)="pickAudioFile()" expand="block">Pick Local Audio File</ion-button>
-  <input id="fileInput" type="file" accept="audio/*" hidden (change)="onFileSelected($event)" />
+  <!-- Local MP3 Upload -->
+  <ion-button (click)="triggerFileInput()" expand="block">Upload MP3 Files</ion-button>
+  <input id="fileInput" type="file" accept="audio/*" hidden (change)="pickAudioFile($event)" />
 
-  <ion-card *ngIf="currentTrack">
-    <img [src]="currentTrack.image" />
+  <!-- Uploaded Tracks -->
+  <ion-list>
+    <!-- Display all uploaded tracks -->
+    <ion-card *ngFor="let track of uploadedTracks; let i = index">
+      <img [src]="track.image" />
+      <ion-card-header (click)="playAudio(track.fileUrl)">
+        <ion-card-title>{{ track.title }}</ion-card-title>
+        <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <!-- Add to Playlist button -->
+        <ion-button fill="clear" color="primary" (click)="addToPlaylist(track)" slot="icon-only">
+          <ion-icon name="add-circle-outline"></ion-icon>
+        </ion-button>
+        <!-- Delete button -->
+        <ion-button fill="clear" color="danger" (click)="deleteUploadedTrack(i)" slot="icon-only">
+          <ion-icon name="trash-outline"></ion-icon>
+        </ion-button>
+      </ion-card-content>
+    </ion-card>
+  </ion-list>
+
+  <!-- Playlist Toggle Button -->
+  <ion-button (click)="togglePlaylistView()" expand="block">
+    {{ showPlaylist ? 'Hide Playlist' : 'View Playlist' }}
+  </ion-button>
+
+  <!-- Playlist List -->
+  <ion-card *ngIf="showPlaylist && playlist.length">
     <ion-card-header>
-      <ion-card-title>{{ currentTrack.title }}</ion-card-title>
-      <ion-card-subtitle>{{ currentTrack.artist }}</ion-card-subtitle>
+      <ion-card-title>Playlist</ion-card-title>
     </ion-card-header>
-    <ion-card-content>
-      <ion-button (click)="playAudio()">Play</ion-button>
-      <ion-button (click)="pauseAudio()">Pause</ion-button>
-      <ion-button (click)="stopAudio()">Stop</ion-button>
-    </ion-card-content>
+    <ion-list>
+      <ion-item *ngFor="let track of playlist; let i = index" (click)="playAudio(track.fileUrl)">
+        <ion-thumbnail slot="start">
+          <img [src]="track.image || 'assets/placeholder.png'" />
+        </ion-thumbnail>
+        <ion-label>
+          <h2>{{ track.title }}</h2>
+          <p>{{ track.artist }}</p>
+        </ion-label>
+        <ion-button fill="clear" slot="end" color="danger" (click)="deleteFromPlaylist(i); $event.stopPropagation();">
+          Remove
+        </ion-button>
+      </ion-item>
+    </ion-list>
   </ion-card>
+
+  <!-- Mini Now Playing Bar -->
+  <ion-footer *ngIf="currentTrack" class="now-playing">
+    <ion-toolbar>
+      <ion-thumbnail slot="start">
+        <img [src]="currentTrack.image || 'assets/placeholder.png'" />
+      </ion-thumbnail>
+      <ion-label>
+        <h3>{{ currentTrack.title }}</h3>
+        <p>{{ currentTrack.artist }}</p>
+      </ion-label>
+      <ion-buttons slot="end">
+        <!-- Previous Song Button -->
+        <ion-button fill="clear" (click)="playPreviousSong()">
+          <ion-icon name="play-skip-back"></ion-icon>
+        </ion-button>
+
+        <!-- Play/Pause Button -->
+        <ion-button fill="clear" (click)="toggleMiniPlayerPlay()">
+          <ion-icon [name]="isPlaying ? 'pause' : 'play'"></ion-icon>
+        </ion-button>
+
+        <!-- Next Song Button -->
+        <ion-button fill="clear" (click)="playNextSong()">
+          <ion-icon name="play-skip-forward"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-footer>
 </ion-content>
