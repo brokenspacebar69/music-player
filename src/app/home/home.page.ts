@@ -11,6 +11,7 @@ import { LocalMusicService } from '../services/local-music.service';
 import { PlayerService } from '../services/player.service';
 import { SpotifyService } from '../services/spotify.service';
 import { Track } from '../models/track.model';
+import { interval, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-home',
@@ -28,6 +29,10 @@ export class HomePage {
   uploadedTracks: Track[] = [];
   isPlaying = false;
   showPlaylist = false;
+  currentTime: number = 0; // Current playback time in seconds
+  trackDuration: number = 0; // Total track duration in seconds
+  progress: number = 0; // Progress value (0 to 1)
+  private progressSubscription: Subscription | null = null;
 
   constructor(
     private http: HttpClient,
@@ -44,11 +49,35 @@ export class HomePage {
 
     this.playerService.currentTrack$.subscribe(track => {
       this.currentTrack = track;
+      if (track) {
+        this.trackDuration = this.playerService.getTrackDuration(); // Get track duration
+        this.startProgressTracking();
+      } else {
+        this.stopProgressTracking();
+      }
     });
 
     this.playerService.isPlaying$.subscribe(val => {
       this.isPlaying = val;
+      if (!val) {
+        this.stopProgressTracking();
+      }
     });
+  }
+
+  private startProgressTracking() {
+    this.stopProgressTracking(); // Clear any existing subscription
+    this.progressSubscription = interval(1000).subscribe(() => {
+      this.currentTime = this.playerService.getCurrentTime(); // Get current playback time
+      this.progress = this.currentTime / this.trackDuration; // Calculate progress
+    });
+  }
+
+  private stopProgressTracking() {
+    if (this.progressSubscription) {
+      this.progressSubscription.unsubscribe();
+      this.progressSubscription = null;
+    }
   }
 
   private async loadUploadedTracks() {

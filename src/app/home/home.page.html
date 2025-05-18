@@ -82,6 +82,7 @@
       <ion-label>
         <h3>{{ currentTrack.title }}</h3>
         <p>{{ currentTrack.artist }}</p>
+        <p>{{ currentTime | date:'mm:ss' }} / {{ trackDuration | date:'mm:ss' }}</p>
       </ion-label>
       <ion-buttons slot="end">
         <!-- Previous Song Button -->
@@ -100,5 +101,6 @@
         </ion-button>
       </ion-buttons>
     </ion-toolbar>
+    <ion-progress-bar [value]="progress"></ion-progress-bar>
   </ion-footer>
 </ion-content>

@@ -91,4 +91,33 @@ export class PlayerService {
     }
     this.isPlaying$.next(false);
   }
+
+  getCurrentTime(): number {
+    if (this.howlerInstance) {
+      return this.howlerInstance.seek() as number; // Current time in seconds
+    } else if (this.mediaObject) {
+      let currentTime = 0;
+      this.mediaObject.getCurrentPosition().then(
+        (position) => {
+          if (position > 0) {
+            currentTime = position; // Update current time if valid
+          }
+        },
+        (error) => {
+          console.error('Error getting current position:', error);
+        }
+      );
+      return currentTime;
+    }
+    return 0;
+  }
+
+  getTrackDuration(): number {
+    if (this.howlerInstance) {
+      return this.howlerInstance.duration(); // Total duration in seconds
+    } else if (this.mediaObject) {
+      return this.mediaObject.getDuration(); // For Cordova/Capacitor
+    }
+    return 0;
+  }
 }
