@@ -12,7 +12,7 @@
   <ion-list *ngIf="searchResults.length > 0">
     <ion-item *ngFor="let track of searchResults" (click)="playStream(track)">
       <ion-thumbnail slot="start">
-        <img [src]="track.album.cover_medium || 'assets/placeholder.png'" />
+        <img [src]="track.album.cover_medium" />
       </ion-thumbnail>
       <ion-label>
         <h2>{{ track.title }}</h2>
@@ -23,23 +23,21 @@
 
   <!-- Local MP3 Upload -->
   <ion-button (click)="triggerFileInput()" expand="block">Upload MP3 Files</ion-button>
-  <input id="fileInput" type="file" accept="audio/*" hidden (change)="pickAudioFile($event)" />
+  <input id="fileInput" type="file" accept="audio/*" hidden (change)="onWebFileSelected($event)" />
+
 
   <!-- Uploaded Tracks -->
   <ion-list>
-    <!-- Display all uploaded tracks -->
-    <ion-card *ngFor="let track of uploadedTracks; let i = index">
+    <ion-card class="compact-card" *ngFor="let track of uploadedTracks; let i = index">
       <img [src]="track.image" />
       <ion-card-header (click)="playAudio(track.fileUrl)">
         <ion-card-title>{{ track.title }}</ion-card-title>
         <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
-        <!-- Add to Playlist button -->
         <ion-button fill="clear" color="primary" (click)="addToPlaylist(track)" slot="icon-only">
           <ion-icon name="add-circle-outline"></ion-icon>
         </ion-button>
-        <!-- Delete button -->
         <ion-button fill="clear" color="danger" (click)="deleteUploadedTrack(i)" slot="icon-only">
           <ion-icon name="trash-outline"></ion-icon>
         </ion-button>
@@ -53,25 +51,20 @@
   </ion-button>
 
   <!-- Playlist List -->
-  <ion-card *ngIf="showPlaylist && playlist.length">
-    <ion-card-header>
-      <ion-card-title>Playlist</ion-card-title>
-    </ion-card-header>
-    <ion-list>
-      <ion-item *ngFor="let track of playlist; let i = index" (click)="playAudio(track.fileUrl)">
-        <ion-thumbnail slot="start">
-          <img [src]="track.image || 'assets/placeholder.png'" />
-        </ion-thumbnail>
-        <ion-label>
-          <h2>{{ track.title }}</h2>
-          <p>{{ track.artist }}</p>
-        </ion-label>
-        <ion-button fill="clear" slot="end" color="danger" (click)="deleteFromPlaylist(i); $event.stopPropagation();">
+  <ng-container *ngIf="showPlaylist && playlist.length">
+    <ion-card class="compact-card" *ngFor="let track of playlist; let i = index">
+      <img [src]="track.image || 'assets/placeholder.png'" />
+      <ion-card-header (click)="playAudio(track.fileUrl)">
+        <ion-card-title>{{ track.title }}</ion-card-title>
+        <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-button fill="clear" color="danger" (click)="deleteFromPlaylist(i); $event.stopPropagation();">
           Remove
         </ion-button>
-      </ion-item>
-    </ion-list>
-  </ion-card>
+      </ion-card-content>
+    </ion-card>
+  </ng-container>
 
   <!-- Mini Now Playing Bar -->
   <ion-footer *ngIf="currentTrack" class="now-playing">
@@ -85,17 +78,14 @@
         <p>{{ currentTime | date:'mm:ss' }} / {{ trackDuration | date:'mm:ss' }}</p>
       </ion-label>
       <ion-buttons slot="end">
-        <!-- Previous Song Button -->
         <ion-button fill="clear" (click)="playPreviousSong()">
           <ion-icon name="play-skip-back"></ion-icon>
         </ion-button>
 
-        <!-- Play/Pause Button -->
         <ion-button fill="clear" (click)="toggleMiniPlayerPlay()">
           <ion-icon [name]="isPlaying ? 'pause' : 'play'"></ion-icon>
         </ion-button>
 
-        <!-- Next Song Button -->
         <ion-button fill="clear" (click)="playNextSong()">
           <ion-icon name="play-skip-forward"></ion-icon>
         </ion-button>

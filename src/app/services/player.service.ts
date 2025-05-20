@@ -1,5 +1,4 @@
-// Path: src/app/services/player.service.ts
-
+// src/app/services/player.service.ts
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { Media, MediaObject } from '@awesome-cordova-plugins/media/ngx';
@@ -7,6 +6,7 @@ import { Platform } from '@ionic/angular';
 import { Howl } from 'howler';
 import { App } from '@capacitor/app';
 import { Track } from '../models/track.model';
+import { Capacitor } from '@capacitor/core';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerService {
@@ -41,8 +41,12 @@ export class PlayerService {
       return;
     }
 
-    if (this.platform.is('cordova')) {
-      this.mediaObject = this.media.create(track.fileUrl);
+    if (this.platform.is('cordova') || (this.platform.is('android') && Capacitor.isNativePlatform())) {
+      let source = track.fileUrl;
+      if (!source.startsWith('file://') && source.startsWith('/')) {
+        source = 'file://' + source;
+      }
+      this.mediaObject = this.media.create(source);
       this.mediaObject.play();
     } else {
       this.howlerInstance = new Howl({
@@ -62,20 +66,20 @@ export class PlayerService {
 
   pause() {
     if (this.howlerInstance) {
-      this.howlerInstance.pause(); // Pause playback
+      this.howlerInstance.pause();
       this.isPlaying$.next(false);
     } else if (this.mediaObject) {
-      this.mediaObject.pause(); // Pause playback for Cordova/Capacitor
+      this.mediaObject.pause();
       this.isPlaying$.next(false);
     }
   }
 
   resume() {
     if (this.howlerInstance) {
-      this.howlerInstance.play(); // Resume playback
+      this.howlerInstance.play();
       this.isPlaying$.next(true);
     } else if (this.mediaObject) {
-      this.mediaObject.play(); // Resume playback for Cordova/Capacitor
+      this.mediaObject.play();
       this.isPlaying$.next(true);
     }
   }
@@ -94,13 +98,13 @@ export class PlayerService {
 
   getCurrentTime(): number {
     if (this.howlerInstance) {
-      return this.howlerInstance.seek() as number; // Current time in seconds
+      return this.howlerInstance.seek() as number;
     } else if (this.mediaObject) {
       let currentTime = 0;
       this.mediaObject.getCurrentPosition().then(
         (position) => {
           if (position > 0) {
-            currentTime = position; // Update current time if valid
+            currentTime = position;
           }
         },
         (error) => {
@@ -114,10 +118,18 @@ export class PlayerService {
 
   getTrackDuration(): number {
     if (this.howlerInstance) {
-      return this.howlerInstance.duration(); // Total duration in seconds
+      return this.howlerInstance.duration();
     } else if (this.mediaObject) {
-      return this.mediaObject.getDuration(); // For Cordova/Capacitor
+      return this.mediaObject.getDuration();
     }
     return 0;
+  }
+
+  seekTo(time: number) {
+    if (this.howlerInstance) {
+      this.howlerInstance.seek(time);
+    } else if (this.mediaObject) {
+      this.mediaObject.seekTo(time * 1000);
+    }
   }
 }

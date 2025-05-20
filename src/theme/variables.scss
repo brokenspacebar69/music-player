@@ -1,2 +1,37 @@
 // For information on how to create your own theme, please see:
 // http://ionicframework.com/docs/theming/
+:root {
+    /* Primary and secondary colors */
+    --ion-color-primary: #e53935;          /* Strong red */
+    --ion-color-primary-rgb: 229, 57, 53;
+    --ion-color-primary-contrast: #fff;
+    --ion-color-primary-contrast-rgb: 255, 255, 255;
+    --ion-color-primary-shade: #c62828;
+    --ion-color-primary-tint: #ef5350;
+  
+    --ion-color-secondary: #000000;        /* Black */
+    --ion-color-secondary-rgb: 0, 0, 0;
+    --ion-color-secondary-contrast: #fff;
+    --ion-color-secondary-contrast-rgb: 255, 255, 255;
+    --ion-color-secondary-shade: #000000;
+    --ion-color-secondary-tint: #2e2e2e;
+  
+    /* Background colors */
+    --ion-background-color: #000000;       /* Black background */
+    --ion-background-color-rgb: 0, 0, 0;
+  
+    /* Text colors */
+    --ion-text-color: #e53935;             /* Red text */
+    --ion-text-color-rgb: 229, 57, 53;
+  
+    /* Medium color for secondary text */
+    --ion-color-medium: #b71c1c;           /* Dark red */
+    --ion-color-medium-rgb: 183, 28, 28;
+  
+    /* Other UI colors */
+    --ion-color-light: #fff;               /* White for contrast */
+    --ion-color-light-rgb: 255, 255, 255;
+  
+    --ion-color-danger: #b71c1c;           /* Dark red for errors */
+  }
+  
