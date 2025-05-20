@@ -1,14 +1,14 @@
-// src/app/home/home.page.ts
 import { HttpClient } from '@angular/common/http';
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { Platform } from '@ionic/angular';
+import { Subscription } from 'rxjs';
+
 import { FilePickerService } from '../services/file-picker.service';
 import { StorageService } from '../services/storage.service';
 import { PlayerService } from '../services/player.service';
 import { DeezerService } from '../services/deezer.service';
 import { Track } from '../models/track.model';
-import { interval, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-home',
@@ -16,20 +16,24 @@ import { interval, Subscription } from 'rxjs';
   styleUrls: ['home.page.scss'],
   standalone: false,
 })
-export class HomePage {
+export class HomePage implements OnDestroy {
   searchQuery = '';
   searchResults: any[] = [];
   isSearching = false;
+
   currentTrack: Track | null = null;
-  favorites: Track[] = [];
   playlist: Track[] = [];
   uploadedTracks: Track[] = [];
   isPlaying = false;
   showPlaylist = false;
+
   currentTime = 0;
   trackDuration = 0;
   progress = 0;
-  private progressSubscription: Subscription | null = null;
+  isExpanded = false;
+  isSeeking = false;
+
+  private subscriptions = new Subscription();
 
   constructor(
     private http: HttpClient,
@@ -42,97 +46,87 @@ export class HomePage {
     this.loadUploadedTracks();
     this.loadPlaylist();
 
-    this.playerService.currentTrack$.subscribe(track => {
-      this.currentTrack = track;
-      if (track) {
-        this.trackDuration = this.playerService.getTrackDuration();
-        this.startProgressTracking();
-      } else {
-        this.stopProgressTracking();
-      }
-    });
+    this.subscriptions.add(
+      this.playerService.currentTrack$.subscribe(track => (this.currentTrack = track))
+    );
 
-    this.playerService.isPlaying$.subscribe(val => {
-      this.isPlaying = val;
-      if (!val) this.stopProgressTracking();
-    });
+    this.subscriptions.add(
+      this.playerService.isPlaying$.subscribe(val => (this.isPlaying = val))
+    );
+
+    this.subscriptions.add(
+      this.playerService.trackDuration$.subscribe(dur => (this.trackDuration = dur))
+    );
+
+    this.subscriptions.add(
+      this.playerService.currentTime$.subscribe(time => {
+        if (!this.isSeeking) {
+          this.currentTime = time;
+          this.progress = this.trackDuration ? this.currentTime / this.trackDuration : 0;
+        }
+      })
+    );
   }
 
-  private startProgressTracking() {
-    this.stopProgressTracking();
-    this.progressSubscription = interval(1000).subscribe(() => {
-      this.currentTime = this.playerService.getCurrentTime();
-      this.progress = this.currentTime / this.trackDuration;
-    });
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
   }
 
-  private stopProgressTracking() {
-    this.progressSubscription?.unsubscribe();
-    this.progressSubscription = null;
-  }
-
-  private async loadUploadedTracks() {
+  private async loadUploadedTracks(): Promise<void> {
     try {
       this.uploadedTracks = await this.storageService.getUploadedTracks();
-    } catch (error) {
-      console.error('Error loading uploaded tracks:', error);
+    } catch (e) {
+      console.error('Error loading uploaded tracks:', e);
     }
   }
 
-  private async loadPlaylist() {
+  private async loadPlaylist(): Promise<void> {
     try {
       this.playlist = await this.storageService.getPlaylists() || [];
-    } catch (error) {
-      console.error('Error loading playlist:', error);
+    } catch (e) {
+      console.error('Error loading playlist:', e);
     }
   }
 
-  triggerFileInput() {
+  triggerFileInput(): void {
     if (Capacitor.getPlatform() === 'web') {
-      const fileInput = document.getElementById('fileInput') as HTMLInputElement;
-      fileInput?.click();
+      (document.getElementById('fileInput') as HTMLInputElement)?.click();
     } else {
       this.pickAudioFileOnAndroid();
     }
   }
 
-  private async pickAudioFileOnAndroid() {
+  private async pickAudioFileOnAndroid(): Promise<void> {
     try {
       const newTrack = await this.filePickerService.pickAudioFile();
-      if (newTrack) {
-        this.uploadedTracks = [newTrack, ...this.uploadedTracks]; 
+    if (newTrack) {
+      const exists = this.uploadedTracks.some(t => t.fileUrl === newTrack.fileUrl);
+      if (!exists) {
+        this.uploadedTracks = [newTrack, ...this.uploadedTracks];
         await this.storageService.setUploadedTracks(this.uploadedTracks);
-        console.log('Added track:', newTrack);
-        console.log('Updated uploadedTracks:', this.uploadedTracks);
-      }
-    } catch (err: unknown) {
-      let errorMessage = 'Unknown error occurred';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      }
+      }}
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Error picking audio file on Android:', errorMessage);
       alert('Failed to pick audio file: ' + errorMessage);
     }
   }
-  
-  async onWebFileSelected(event: any) {
-    const newTrack = await this.filePickerService.onFileSelected(event);
-    if (newTrack) {
-      this.uploadedTracks = [newTrack, ...this.uploadedTracks]; 
-      await this.storageService.setUploadedTracks(this.uploadedTracks);
-      console.log('Added track (web):', newTrack);
-      console.log('Updated uploadedTracks:', this.uploadedTracks);
-    }
-  }
 
-  async searchMusic() {
+  async onWebFileSelected(event: Event): Promise<void> {
+    const newTrack = await this.filePickerService.onFileSelected(event);
+  if (newTrack) {
+    const exists = this.uploadedTracks.some(t => t.fileUrl === newTrack.fileUrl);
+    if (!exists) {
+      this.uploadedTracks = [newTrack, ...this.uploadedTracks];
+      await this.storageService.setUploadedTracks(this.uploadedTracks);
+    }
+  }}
+
+  async searchMusic(): Promise<void> {
     if (!this.searchQuery.trim()) {
       this.searchResults = [];
       return;
     }
-
     this.isSearching = true;
     try {
       const results = await this.deezerService.searchTracks(this.searchQuery);
@@ -145,90 +139,112 @@ export class HomePage {
         },
         preview: track.preview || null,
       }));
-    } catch (error) {
-      console.error('Deezer search error:', error);
+    } catch (e) {
+      console.error('Deezer search error:', e);
     } finally {
       this.isSearching = false;
     }
   }
 
-  playStream(track: any) {
-    const previewUrl = track.preview;
-    if (!previewUrl) {
+  playStream(track: any): void {
+    if (!track.preview) {
       alert('Preview not available');
       return;
     }
-
     const metaTrack: Track = {
       title: track.title,
       artist: track.artist.name,
       album: track.album.title,
       image: track.album?.cover_medium || 'assets/placeholder.png',
-      fileUrl: previewUrl,
+      fileUrl: track.preview,
       isLocal: false,
     };
-
     this.playerService.play(metaTrack);
-    this.currentTrack = metaTrack;
   }
 
-  playAudio(fileUrl?: string) {
-    if (fileUrl) {
-      const track = this.playlist.find(t => t.fileUrl === fileUrl)
-        || this.uploadedTracks.find(t => t.fileUrl === fileUrl);
-      if (track) {
-        this.currentTrack = track;
-        this.playerService.play(track);
-      }
-    } else if (this.currentTrack?.fileUrl) {
-      this.playerService.play(this.currentTrack);
-    }
+  playAudio(fileUrl?: string): void {
+    const track = fileUrl
+      ? this.playlist.find(t => t.fileUrl === fileUrl) || this.uploadedTracks.find(t => t.fileUrl === fileUrl)
+      : this.currentTrack;
+
+    if (track) this.playerService.play(track);
   }
 
-  pauseAudio() {
+  pauseAudio(): void {
     this.playerService.pause();
   }
 
-  stopAudio() {
+  stopAudio(): void {
     this.playerService.stop();
   }
 
-  toggleMiniPlayerPlay() {
+  toggleMiniPlayerPlay(): void {
     this.isPlaying ? this.playerService.pause() : this.playerService.resume();
   }
 
-  async addToPlaylist(track: Track) {
-    const exists = this.playlist.some(t => t.fileUrl === track.fileUrl);
-    if (!exists) {
+  async addToPlaylist(track: Track): Promise<void> {
+    if (!this.playlist.some(t => t.fileUrl === track.fileUrl)) {
       this.playlist.unshift(track);
       await this.storageService.setPlaylists(this.playlist);
     }
   }
 
-  deleteFromPlaylist(index: number) {
+  deleteFromPlaylist(index: number): void {
     this.playlist.splice(index, 1);
     this.storageService.setPlaylists(this.playlist);
   }
 
-  togglePlaylistView() {
+  togglePlaylistView(): void {
     this.showPlaylist = !this.showPlaylist;
   }
 
-  playPreviousSong() {
-    const idx = this.playlist.findIndex(t => t.fileUrl === this.currentTrack?.fileUrl);
-    if (idx > 0) this.playAudio(this.playlist[idx - 1].fileUrl);
+  playPreviousSong(): void {
+    const list = this.playlist.length ? this.playlist : this.uploadedTracks;
+    const idx = list.findIndex(t => t.fileUrl === this.currentTrack?.fileUrl);
+    if (idx > 0) this.playAudio(list[idx - 1].fileUrl);
   }
 
-  playNextSong() {
-    const idx = this.playlist.findIndex(t => t.fileUrl === this.currentTrack?.fileUrl);
-    if (idx < this.playlist.length - 1) this.playAudio(this.playlist[idx + 1].fileUrl);
+  playNextSong(): void {
+    const list = this.playlist.length ? this.playlist : this.uploadedTracks;
+    const idx = list.findIndex(t => t.fileUrl === this.currentTrack?.fileUrl);
+    if (idx >= 0 && idx < list.length - 1) this.playAudio(list[idx + 1].fileUrl);
   }
 
-  async deleteUploadedTrack(index: number) {
+  async deleteUploadedTrack(index: number): Promise<void> {
     const track = this.uploadedTracks[index];
     this.uploadedTracks.splice(index, 1);
     await this.storageService.setUploadedTracks(this.uploadedTracks);
     this.playlist = this.playlist.filter(t => t.fileUrl !== track.fileUrl);
     await this.storageService.setPlaylists(this.playlist);
+  }
+
+  toggleExpand(): void {
+    this.isExpanded = !this.isExpanded;
+  }
+
+  stopPropagation(event: Event): void {
+    event.stopPropagation();
+  }
+
+  onSeekStart(): void {
+    this.isSeeking = true;
+  }
+
+  onSeekChange(event: any): void {
+    const newTime = event.detail.value;
+    this.currentTime = newTime;
+    this.progress = this.trackDuration ? this.currentTime / this.trackDuration : 0;
+  }
+
+  onSeekEnd(event: any): void {
+    this.playerService.seekTo(event.detail.value);
+    this.isSeeking = false;
+  }
+
+  formatTime(seconds: number): string {
+    if (!seconds || isNaN(seconds)) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   }
 }

@@ -1,6 +1,5 @@
-// src/app/services/player.service.ts
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable, NgZone } from '@angular/core';
+import { BehaviorSubject, interval, Subscription } from 'rxjs';
 import { Media, MediaObject } from '@awesome-cordova-plugins/media/ngx';
 import { Platform } from '@ionic/angular';
 import { Howl } from 'howler';
@@ -12,14 +11,20 @@ import { Capacitor } from '@capacitor/core';
 export class PlayerService {
   private mediaObject: MediaObject | null = null;
   private howlerInstance: Howl | null = null;
+  private androidProgressInterval: number | null = null;
+
   currentTrack$ = new BehaviorSubject<Track | null>(null);
   isPlaying$ = new BehaviorSubject<boolean>(false);
+  trackDuration$ = new BehaviorSubject<number>(0);
+  currentTime$ = new BehaviorSubject<number>(0);
 
-  constructor(private media: Media, private platform: Platform) {
+  private howlerProgressSubscription: Subscription | null = null;
+
+  constructor(private media: Media, private platform: Platform, private zone: NgZone) {
     this.setupAppListeners();
   }
 
-  private setupAppListeners() {
+  private setupAppListeners(): void {
     App.addListener('pause', () => this.pause());
 
     if (this.platform.is('android')) {
@@ -33,7 +38,7 @@ export class PlayerService {
     }
   }
 
-  play(track: Track) {
+  play(track: Track): void {
     this.stop();
 
     if (!track.fileUrl) {
@@ -48,23 +53,84 @@ export class PlayerService {
       }
       this.mediaObject = this.media.create(source);
       this.mediaObject.play();
+
+      const durationPoll = setInterval(() => {
+        const dur = this.mediaObject?.getDuration() || -1;
+        if (dur > 0) {
+          this.trackDuration$.next(dur);
+          clearInterval(durationPoll);
+        }
+      }, 500);
+
+      this.startAndroidProgressTracking();
+
+      this.isPlaying$.next(true); 
+
     } else {
       this.howlerInstance = new Howl({
         src: [track.fileUrl],
         html5: true,
+        onload: () => {
+          this.trackDuration$.next(this.howlerInstance?.duration() || 0);
+        },
         onplay: () => this.isPlaying$.next(true),
-        onend: () => this.isPlaying$.next(false),
+        onend: () => {
+          this.isPlaying$.next(false);
+          this.currentTime$.next(0);
+          this.trackDuration$.next(0);
+        },
         onpause: () => this.isPlaying$.next(false),
         onstop: () => this.isPlaying$.next(false),
       });
       this.howlerInstance.play();
+
+      this.startHowlerProgressTracking();
     }
 
     this.currentTrack$.next(track);
-    this.isPlaying$.next(true);
   }
 
-  pause() {
+  private startHowlerProgressTracking(): void {
+    this.stopHowlerProgressTracking();
+    this.howlerProgressSubscription = interval(500).subscribe(() => {
+      if (this.howlerInstance && this.isPlaying$.value) {
+        const time = this.howlerInstance.seek() as number;
+        this.currentTime$.next(time);
+      }
+    });
+  }
+
+  private stopHowlerProgressTracking(): void {
+    this.howlerProgressSubscription?.unsubscribe();
+    this.howlerProgressSubscription = null;
+  }
+
+  private startAndroidProgressTracking(): void {
+    this.stopAndroidProgressTracking();
+    if (!this.mediaObject) return;
+
+    this.androidProgressInterval = window.setInterval(() => {
+      this.mediaObject?.getCurrentPosition().then(position => {
+        if (position >= 0) {
+          this.zone.run(() => {
+            this.currentTime$.next(position);
+            this.isPlaying$.next(true);
+          });
+        }
+      }).catch(err => {
+        console.error('Error getting current position:', err);
+      });
+    }, 500);
+  }
+
+  private stopAndroidProgressTracking(): void {
+    if (this.androidProgressInterval !== null) {
+      clearInterval(this.androidProgressInterval);
+      this.androidProgressInterval = null;
+    }
+  }
+
+  pause(): void {
     if (this.howlerInstance) {
       this.howlerInstance.pause();
       this.isPlaying$.next(false);
@@ -74,7 +140,7 @@ export class PlayerService {
     }
   }
 
-  resume() {
+  resume(): void {
     if (this.howlerInstance) {
       this.howlerInstance.play();
       this.isPlaying$.next(true);
@@ -84,52 +150,29 @@ export class PlayerService {
     }
   }
 
-  stop() {
+  stop(): void {
     if (this.platform.is('cordova')) {
       this.mediaObject?.stop();
       this.mediaObject?.release();
       this.mediaObject = null;
+      this.stopAndroidProgressTracking();
     } else {
       this.howlerInstance?.stop();
       this.howlerInstance = null;
+      this.stopHowlerProgressTracking();
     }
     this.isPlaying$.next(false);
+    this.currentTime$.next(0);
+    this.trackDuration$.next(0);
   }
 
-  getCurrentTime(): number {
-    if (this.howlerInstance) {
-      return this.howlerInstance.seek() as number;
-    } else if (this.mediaObject) {
-      let currentTime = 0;
-      this.mediaObject.getCurrentPosition().then(
-        (position) => {
-          if (position > 0) {
-            currentTime = position;
-          }
-        },
-        (error) => {
-          console.error('Error getting current position:', error);
-        }
-      );
-      return currentTime;
-    }
-    return 0;
-  }
-
-  getTrackDuration(): number {
-    if (this.howlerInstance) {
-      return this.howlerInstance.duration();
-    } else if (this.mediaObject) {
-      return this.mediaObject.getDuration();
-    }
-    return 0;
-  }
-
-  seekTo(time: number) {
+  seekTo(time: number): void {
     if (this.howlerInstance) {
       this.howlerInstance.seek(time);
+      this.currentTime$.next(time);
     } else if (this.mediaObject) {
       this.mediaObject.seekTo(time * 1000);
+      this.currentTime$.next(time);
     }
   }
 }

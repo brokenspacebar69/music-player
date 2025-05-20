@@ -3,12 +3,13 @@ import { Capacitor } from '@capacitor/core';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
 import { LocalMusicService } from './local-music.service';
 import { Track } from '../models/track.model';
+import { FilePath } from '@awesome-cordova-plugins/file-path/ngx';
 
-declare var fileChooser: any;
+declare const fileChooser: any;
 
 @Injectable({ providedIn: 'root' })
 export class FilePickerService {
-  constructor(private localMusicService: LocalMusicService) {}
+  constructor(private localMusicService: LocalMusicService, private filePath: FilePath) {}
 
   async pickAudioFile(): Promise<Track | null> {
     if (Capacitor.getPlatform() === 'android') {
@@ -16,22 +17,14 @@ export class FilePickerService {
         const uri: string = await new Promise((resolve, reject) => {
           fileChooser.open(resolve, reject);
         });
-
-        const response = await fetch(uri);
-        const blob = await response.blob();
-
-        let meta;
-        try {
-          meta = await this.localMusicService.readAudioMetadata(blob);
-        } catch {
-          meta = { title: 'Unknown Title', artist: 'Unknown Artist', image: 'assets/placeholder.png' };
-        }
+        const resolvedPath = await this.filePath.resolveNativePath(uri);
+        const fileName = resolvedPath.split('/').pop() ?? 'Unknown Title';
 
         return {
-          title: meta.title || 'Unknown Title',
-          artist: meta.artist || 'Unknown Artist',
-          image: meta.image || 'assets/placeholder.png',
-          fileUrl: uri,
+          title: fileName.replace(/\.[^/.]+$/, ''),
+          artist: 'Unknown Artist',
+          image: 'assets/placeholder.png',
+          fileUrl: resolvedPath,
           isLocal: true,
         };
       } catch (err) {
@@ -39,21 +32,16 @@ export class FilePickerService {
         return null;
       }
     } else {
-      // Use capawesome file picker on iOS and Web
       try {
         const result = await FilePicker.pickFiles({ types: ['audio/*'] });
         const file = result.files?.[0] as any;
         if (!file) return null;
 
         const pathOrWebPath = file.webPath ?? file.path ?? '';
-        if (!pathOrWebPath) {
-          console.error('No valid path or webPath for picked file');
-          return null;
-        }
+        if (!pathOrWebPath) return null;
 
         const response = await fetch(pathOrWebPath);
         const blob = await response.blob();
-
         const meta = await this.localMusicService.readAudioMetadata(blob);
         const base64Audio = await this.readBlobAsBase64(blob);
 
@@ -71,8 +59,9 @@ export class FilePickerService {
     }
   }
 
-  async onFileSelected(event: any): Promise<Track | null> {
-    const file: File = event.target.files?.[0];
+  async onFileSelected(event: Event): Promise<Track | null> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return null;
 
     try {

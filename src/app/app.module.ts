@@ -13,6 +13,7 @@ import { IonicStorageModule } from '@ionic/storage-angular';
 import { Media } from '@awesome-cordova-plugins/media/ngx';
 import { File } from '@awesome-cordova-plugins/file/ngx';
 import { AndroidPermissions } from '@awesome-cordova-plugins/android-permissions/ngx';
+import { FilePath } from '@awesome-cordova-plugins/file-path/ngx';
 
 @NgModule({
   declarations: [AppComponent],
@@ -22,6 +23,7 @@ import { AndroidPermissions } from '@awesome-cordova-plugins/android-permissions
     AppRoutingModule,
     HttpClientModule,
     IonicStorageModule.forRoot(),
+    
   ],
   providers: [
     StatusBar,
@@ -29,6 +31,7 @@ import { AndroidPermissions } from '@awesome-cordova-plugins/android-permissions
     Media,
     File,
     AndroidPermissions,
+    FilePath,
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy }
   ],
   bootstrap: [AppComponent]

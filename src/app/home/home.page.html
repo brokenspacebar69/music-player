@@ -5,14 +5,21 @@
 </ion-header>
 
 <ion-content>
-  <!-- Spotify Search -->
-  <ion-searchbar [(ngModel)]="searchQuery" (ionInput)="searchMusic()" placeholder="Search songs..."></ion-searchbar>
 
-  <!-- Spotify Search Results -->
+  <!-- Search -->
+  <ion-searchbar 
+    [(ngModel)]="searchQuery" 
+    (ionInput)="searchMusic()" 
+    placeholder="Search songs..."
+    debounce="300"
+    showCancelButton="focus"
+  ></ion-searchbar>
+
+  <!-- Search Results -->
   <ion-list *ngIf="searchResults.length > 0">
     <ion-item *ngFor="let track of searchResults" (click)="playStream(track)">
       <ion-thumbnail slot="start">
-        <img [src]="track.album.cover_medium" />
+        <img [src]="track.album.cover_medium" alt="Album art"/>
       </ion-thumbnail>
       <ion-label>
         <h2>{{ track.title }}</h2>
@@ -22,23 +29,31 @@
   </ion-list>
 
   <!-- Local MP3 Upload -->
-  <ion-button (click)="triggerFileInput()" expand="block">Upload MP3 Files</ion-button>
-  <input id="fileInput" type="file" accept="audio/*" hidden (change)="onWebFileSelected($event)" />
-
+  <ion-button expand="block" (click)="triggerFileInput()">
+    Upload MP3 Files
+  </ion-button>
+  <input 
+    id="fileInput" 
+    type="file" 
+    accept="audio/*" 
+    hidden 
+    (change)="onWebFileSelected($event)" 
+    multiple
+  />
 
   <!-- Uploaded Tracks -->
   <ion-list>
     <ion-card class="compact-card" *ngFor="let track of uploadedTracks; let i = index">
-      <img [src]="track.image" />
+      <img [src]="track.image || 'assets/placeholder.png'" alt="Album art"/>
       <ion-card-header (click)="playAudio(track.fileUrl)">
         <ion-card-title>{{ track.title }}</ion-card-title>
         <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
-        <ion-button fill="clear" color="primary" (click)="addToPlaylist(track)" slot="icon-only">
-          <ion-icon name="add-circle-outline"></ion-icon>
+        <ion-button fill="clear" color="primary" (click)="addToPlaylist(track)" slot="icon-only" aria-label="Add to playlist">
+          <ion-icon name="heart-outline"></ion-icon>
         </ion-button>
-        <ion-button fill="clear" color="danger" (click)="deleteUploadedTrack(i)" slot="icon-only">
+        <ion-button fill="clear" color="danger" (click)="deleteUploadedTrack(i)" slot="icon-only" aria-label="Delete track">
           <ion-icon name="trash-outline"></ion-icon>
         </ion-button>
       </ion-card-content>
@@ -46,51 +61,133 @@
   </ion-list>
 
   <!-- Playlist Toggle Button -->
-  <ion-button (click)="togglePlaylistView()" expand="block">
+  <ion-button expand="block" (click)="togglePlaylistView()">
     {{ showPlaylist ? 'Hide Playlist' : 'View Playlist' }}
   </ion-button>
 
   <!-- Playlist List -->
-  <ng-container *ngIf="showPlaylist && playlist.length">
+  <ng-container *ngIf="showPlaylist && playlist.length > 0">
     <ion-card class="compact-card" *ngFor="let track of playlist; let i = index">
-      <img [src]="track.image || 'assets/placeholder.png'" />
+      <img [src]="track.image || 'assets/placeholder.png'" alt="Album art"/>
       <ion-card-header (click)="playAudio(track.fileUrl)">
         <ion-card-title>{{ track.title }}</ion-card-title>
         <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
-        <ion-button fill="clear" color="danger" (click)="deleteFromPlaylist(i); $event.stopPropagation();">
-          Remove
+        <ion-button fill="clear" color="danger" (click)="deleteFromPlaylist(i); $event.stopPropagation();" aria-label="Remove from playlist">
+          <ion-icon name="remove-outline"></ion-icon>
         </ion-button>
       </ion-card-content>
     </ion-card>
   </ng-container>
 
-  <!-- Mini Now Playing Bar -->
-  <ion-footer *ngIf="currentTrack" class="now-playing">
-    <ion-toolbar>
-      <ion-thumbnail slot="start">
-        <img [src]="currentTrack.image || 'assets/placeholder.png'" />
-      </ion-thumbnail>
-      <ion-label>
-        <h3>{{ currentTrack.title }}</h3>
-        <p>{{ currentTrack.artist }}</p>
-        <p>{{ currentTime | date:'mm:ss' }} / {{ trackDuration | date:'mm:ss' }}</p>
-      </ion-label>
-      <ion-buttons slot="end">
-        <ion-button fill="clear" (click)="playPreviousSong()">
-          <ion-icon name="play-skip-back"></ion-icon>
-        </ion-button>
-
-        <ion-button fill="clear" (click)="toggleMiniPlayerPlay()">
-          <ion-icon [name]="isPlaying ? 'pause' : 'play'"></ion-icon>
-        </ion-button>
-
-        <ion-button fill="clear" (click)="playNextSong()">
-          <ion-icon name="play-skip-forward"></ion-icon>
-        </ion-button>
-      </ion-buttons>
-    </ion-toolbar>
-    <ion-progress-bar [value]="progress"></ion-progress-bar>
-  </ion-footer>
 </ion-content>
+
+<!-- Mini Now Playing Bar -->
+<ion-footer 
+  *ngIf="currentTrack" 
+  [class.expanded]="isExpanded"
+  (click)="toggleExpand()"
+  style="
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.2); 
+    background-color: var(--ion-background-color); 
+    color: var(--ion-color-light); 
+    transition: all 0.4s ease; 
+    border-radius: 16px 16px 0 0; 
+    overflow: hidden; 
+    position: relative;
+  "
+>
+  <ion-toolbar style="height: 100%;">
+    <div
+      class="player-container"
+      [style.height]="isExpanded ? '100%' : '60px'"
+      style="display: flex; flex-direction: column; transition: height 0.4s ease; width: 100%;"
+    >
+      <!-- Compact mini player -->
+      <div
+        *ngIf="!isExpanded"
+        style="display: flex; align-items: center; padding: 10px; cursor: pointer;"
+      >
+        <img
+          [src]="currentTrack.image || 'assets/placeholder.png'"
+          alt="Album art"
+          style="width: 48px; height: 48px; object-fit: cover; border-radius: 8px; margin-right: 12px;"
+        />
+        <div style="flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+          <div style="font-weight: 600; font-size: 14px;">{{ currentTrack.title }}</div>
+          <div style="font-size: 12px; color: var(--ion-color-medium);">{{ currentTrack.artist }}</div>
+        </div>
+        <ion-buttons>
+          <ion-button fill="clear" (click)="playPreviousSong(); $event.stopPropagation()" color="light" aria-label="Previous song">
+            <ion-icon name="play-back"></ion-icon>
+          </ion-button>
+          <ion-button fill="clear" (click)="toggleMiniPlayerPlay(); $event.stopPropagation()" color="light" aria-label="Play/Pause">
+            <ion-icon [name]="isPlaying ? 'pause' : 'play'"></ion-icon>
+          </ion-button>
+          <ion-button fill="clear" (click)="playNextSong(); $event.stopPropagation()" color="light" aria-label="Next song">
+            <ion-icon name="play-forward"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </div>
+
+      <!-- Expanded full player -->
+      <div
+        *ngIf="isExpanded"
+        style="flex: 1; padding: 20px; display: flex; flex-direction: column; color: var(--ion-color-light); cursor: default;"
+        (click)="$event.stopPropagation()"
+      >
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0;">Now Playing</h2>
+          <ion-button fill="clear" (click)="toggleExpand(); $event.stopPropagation()" color="light" aria-label="Close full player">
+            <ion-icon name="close"></ion-icon>
+          </ion-button>
+        </div>
+
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 20px;">
+          <img
+            [src]="currentTrack.image || 'assets/placeholder.png'"
+            alt="Album art"
+            style="width: 250px; height: 250px; object-fit: cover; border-radius: 16px; margin-bottom: 20px;"
+          />
+          <div style="font-weight: 700; font-size: 22px; text-align: center; overflow-wrap: break-word;">{{ currentTrack.title }}</div>
+          <div style="font-size: 18px; color: var(--ion-color-medium); margin-bottom: 20px; overflow-wrap: break-word;">{{ currentTrack.artist }}</div>
+
+          <!-- Progress and timing -->
+          <ion-range
+            min="0"
+            [max]="trackDuration"
+            [value]="currentTime"
+            (ionKnobMoveStart)="onSeekStart()"
+            (ionChange)="onSeekChange($event)"
+            (ionKnobMoveEnd)="onSeekEnd($event)"
+            step="1"
+            snaps="true"
+            debounce="0"
+            color="primary"
+            style="width: 100%; margin-bottom: 10px;"
+          >
+          </ion-range>
+
+          <div style="width: 100%; display: flex; justify-content: space-between; font-size: 14px; color: var(--ion-color-medium);">
+            <span>{{ formatTime(currentTime) }}</span>
+            <span>{{ formatTime(trackDuration) }}</span>
+          </div>
+
+          <!-- Playback controls -->
+          <div style="margin-top: 30px; display: flex; justify-content: center; gap: 40px;">
+            <ion-button fill="clear" size="large" (click)="playPreviousSong()" aria-label="Previous song">
+              <ion-icon name="play-back" style="font-size: 32px;"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" size="large" (click)="toggleMiniPlayerPlay()" aria-label="Play/Pause">
+              <ion-icon [name]="isPlaying ? 'pause' : 'play'" style="font-size: 48px;"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" size="large" (click)="playNextSong()" aria-label="Next song">
+              <ion-icon name="play-forward" style="font-size: 32px;"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ion-toolbar>
+</ion-footer>

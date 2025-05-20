@@ -1,4 +1,3 @@
-// Path: src/app/services/storage.service.ts
 import { Injectable } from '@angular/core';
 import { Storage } from '@ionic/storage-angular';
 import { Track } from '../models/track.model';
@@ -24,9 +23,9 @@ export class StorageService {
   async setPlaylists(data: Track[]): Promise<void> {
     try {
       await this.storage.set('playlist', data);
-      console.log('Playlist saved to storage:', data);
+      console.log('Playlist saved:', data);
     } catch (error) {
-      console.error('Error saving playlist to storage:', error);
+      console.error('Error saving playlist:', error);
     }
   }
 
@@ -38,4 +37,3 @@ export class StorageService {
     await this.storage.set('uploadedTracks', data);
   }
 }
-

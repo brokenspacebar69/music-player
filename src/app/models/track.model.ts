@@ -1,4 +1,3 @@
-// src/app/models/track.model.ts
 
 export interface Track {
     title: string;
