@@ -104,68 +104,83 @@ ion-card {
   display: flex;
   align-items: center;
   box-shadow: none;
+}
 
-  img {
-    width: 50px;
-    height: 50px;
-    border-radius: 6px;
-    margin-right: 12px;
-    object-fit: cover;
-    flex-shrink: 0;
-  }
+.compact-card img {
+  width: 50px;
+  height: 50px;
+  border-radius: 6px;
+  margin-right: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
 
-  ion-card-header {
-    flex: 1;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+.compact-card ion-card-header {
+  flex: 1;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0; 
+}
 
-    ion-card-title {
-      font-size: 1rem;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-bottom: 2px;
-      max-width: 100%;
-      color: var(--ion-text-color);
-    }
+.compact-card ion-card-header .text-wrapper {
+  min-width: 0;
+}
 
-    ion-card-subtitle {
-      font-size: 0.85rem;
-      color: var(--ion-color-medium);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
-    }
-  }
+.compact-card ion-card-title,
+.compact-card ion-card-subtitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--ion-text-color);
+}
 
-  ion-card-content {
-    padding: 0 0.25rem 0 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.25rem;
+.compact-card ion-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
 
-    ion-button {
-      --padding-start: 0;
-      --padding-end: 0;
-      width: 36px;
-      height: 36px;
-      min-height: 36px;
-      font-size: 1.2rem;
-      flex-shrink: 0;
-      margin: 0;
-    }
+.compact-card ion-card-subtitle {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 
-    ion-icon {
-      font-size: 20px;
-    }
-  }
+
+.compact-card ion-card-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  padding: 0 0.25rem 0 0.5rem;
+  flex-shrink: 0;
+  width: 80px; 
+}
+
+/* Buttons fixed size */
+.compact-card ion-card-content ion-button {
+  --padding-start: 0;
+  --padding-end: 0;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.compact-card ion-card-content ion-icon {
+  font-size: 20px;
 }
 
 @media (max-width: 400px) {

@@ -46,8 +46,10 @@
     <ion-card class="compact-card" *ngFor="let track of uploadedTracks; let i = index">
       <img [src]="track.image || 'assets/placeholder.png'" alt="Album art"/>
       <ion-card-header (click)="playAudio(track.fileUrl)">
-        <ion-card-title>{{ track.title }}</ion-card-title>
-        <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
+        <div class="text-wrapper">
+          <ion-card-title>{{ track.title }}</ion-card-title>
+          <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
+        </div>
       </ion-card-header>
       <ion-card-content>
         <ion-button fill="clear" color="primary" (click)="addToPlaylist(track)" slot="icon-only" aria-label="Add to playlist">
@@ -70,8 +72,10 @@
     <ion-card class="compact-card" *ngFor="let track of playlist; let i = index">
       <img [src]="track.image || 'assets/placeholder.png'" alt="Album art"/>
       <ion-card-header (click)="playAudio(track.fileUrl)">
-        <ion-card-title>{{ track.title }}</ion-card-title>
-        <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
+        <div class="text-wrapper">
+          <ion-card-title>{{ track.title }}</ion-card-title>
+          <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
+        </div>
       </ion-card-header>
       <ion-card-content>
         <ion-button fill="clear" color="danger" (click)="deleteFromPlaylist(i); $event.stopPropagation();" aria-label="Remove from playlist">
