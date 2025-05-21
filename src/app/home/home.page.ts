@@ -182,6 +182,11 @@ export class HomePage implements OnDestroy {
     this.isPlaying ? this.playerService.pause() : this.playerService.resume();
   }
 
+  stopAndClosePlayer(): void {
+    this.stopAudio();           
+    this.currentTrack = null;   
+  }
+  
   async addToPlaylist(track: Track): Promise<void> {
     if (!this.playlist.some(t => t.fileUrl === track.fileUrl)) {
       this.playlist.unshift(track);

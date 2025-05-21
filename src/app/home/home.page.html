@@ -122,7 +122,7 @@
           <div style="font-weight: 600; font-size: 14px;">{{ currentTrack.title }}</div>
           <div style="font-size: 12px; color: var(--ion-color-medium);">{{ currentTrack.artist }}</div>
         </div>
-        <ion-buttons>
+        <ion-buttons style="display: flex; align-items: center;">
           <ion-button fill="clear" (click)="playPreviousSong(); $event.stopPropagation()" color="light" aria-label="Previous song">
             <ion-icon name="play-back"></ion-icon>
           </ion-button>
@@ -132,7 +132,10 @@
           <ion-button fill="clear" (click)="playNextSong(); $event.stopPropagation()" color="light" aria-label="Next song">
             <ion-icon name="play-forward"></ion-icon>
           </ion-button>
-        </ion-buttons>
+          <ion-button fill="clear" (click)="stopAndClosePlayer(); $event.stopPropagation()" color="danger" aria-label="Close player">
+            <ion-icon name="close"></ion-icon>
+          </ion-button>
+        </ion-buttons>        
       </div>
 
       <!-- Expanded full player -->
