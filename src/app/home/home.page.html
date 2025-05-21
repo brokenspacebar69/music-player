@@ -52,7 +52,7 @@
         </div>
       </ion-card-header>
       <ion-card-content>
-        <ion-button fill="clear" color="primary" (click)="addToPlaylist(track)" slot="icon-only" aria-label="Add to playlist">
+        <ion-button fill="clear" color="primary" (click)="addTrackToAlbum(track)" slot="icon-only" aria-label="Add to playlist">
           <ion-icon name="heart-outline"></ion-icon>
         </ion-button>
         <ion-button fill="clear" color="danger" (click)="deleteUploadedTrack(i)" slot="icon-only" aria-label="Delete track">
@@ -64,26 +64,54 @@
 
   <!-- Playlist Toggle Button -->
   <ion-button expand="block" (click)="togglePlaylistView()">
-    {{ showPlaylist ? 'Hide Playlist' : 'View Playlist' }}
+    {{ showPlaylist ? 'Hide Albums' : 'View Albums' }}
+  </ion-button>
+  
+  <ion-button expand="block" color="secondary" (click)="createAlbumPrompt()">
+    Create New Album
   </ion-button>
 
   <!-- Playlist List -->
-  <ng-container *ngIf="showPlaylist && playlist.length > 0">
-    <ion-card class="compact-card" *ngFor="let track of playlist; let i = index">
-      <img [src]="track.image || 'assets/placeholder.png'" alt="Album art"/>
-      <ion-card-header (click)="playAudio(track.fileUrl)">
-        <div class="text-wrapper">
-          <ion-card-title>{{ track.title }}</ion-card-title>
-          <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
-        </div>
-      </ion-card-header>
-      <ion-card-content>
-        <ion-button fill="clear" color="danger" (click)="deleteFromPlaylist(i); $event.stopPropagation();" aria-label="Remove from playlist">
-          <ion-icon name="remove-outline"></ion-icon>
-        </ion-button>
-      </ion-card-content>
-    </ion-card>
-  </ng-container>
+  <ng-container *ngIf="showPlaylist && albumNames.length > 0">
+    <div *ngFor="let albumName of albumNames">
+      <ion-item button (click)="toggleAlbumVisibility(albumName)">
+        <ion-label>
+          <strong>{{ albumName }}</strong>
+        </ion-label>
+        <ion-buttons slot="end">
+          <ion-button fill="clear" color="primary" (click)="renameAlbum(albumName); $event.stopPropagation();" aria-label="Rename album">
+            <ion-icon name="create-outline"></ion-icon>
+          </ion-button>
+          <ion-button fill="clear" color="danger" (click)="deleteAlbum(albumName); $event.stopPropagation();" aria-label="Delete album">
+            <ion-icon name="trash-outline"></ion-icon>
+          </ion-button>
+          <ion-icon
+            [name]="visibleAlbums.has(albumName) ? 'chevron-up-outline' : 'chevron-down-outline'"
+            style="margin-left: 8px;"
+          ></ion-icon>
+        </ion-buttons>
+      </ion-item>
+  
+      <ng-container *ngIf="visibleAlbums.has(albumName)">
+        <ion-card class="compact-card" *ngFor="let track of albumMap[albumName]; let i = index">
+          <img [src]="track.image || 'assets/placeholder.png'" alt="Album art" />
+          <ion-card-header (click)="playAudio(track.fileUrl)">
+            <div class="text-wrapper">
+              <ion-card-title>{{ track.title }}</ion-card-title>
+              <ion-card-subtitle>{{ track.artist }}</ion-card-subtitle>
+            </div>
+          </ion-card-header>
+          <ion-card-content>
+            <ion-button fill="clear" color="danger"
+              (click)="albumMap[albumName].splice(i, 1); storageService.setAlbums(albumMap); $event.stopPropagation();"
+              aria-label="Remove from album">
+              <ion-icon name="remove-outline"></ion-icon>
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
+      </ng-container>
+    </div>
+  </ng-container>    
 
 </ion-content>
 

@@ -32,19 +32,25 @@ export class HomePage implements OnDestroy {
   progress = 0;
   isExpanded = false;
   isSeeking = false;
-
+  albumMap: { [album: string]: Track[] } = {};
+  newAlbumName = '';
+  selectedAlbum = '';
+  visibleAlbums = new Set<string>();
   private subscriptions = new Subscription();
+  
 
   constructor(
     private http: HttpClient,
     private platform: Platform,
     private filePickerService: FilePickerService,
-    private storageService: StorageService,
+    public storageService: StorageService,
     private playerService: PlayerService,
     private deezerService: DeezerService
   ) {
+    
     this.loadUploadedTracks();
     this.loadPlaylist();
+    this.loadAlbums();
 
     this.subscriptions.add(
       this.playerService.currentTrack$.subscribe(track => (this.currentTrack = track))
@@ -68,6 +74,10 @@ export class HomePage implements OnDestroy {
     );
   }
 
+  get albumNames(): string[] {
+    return Object.keys(this.albumMap);
+  }
+
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
   }
@@ -88,6 +98,99 @@ export class HomePage implements OnDestroy {
     }
   }
 
+  private async loadAlbums(): Promise<void> {
+    try {
+      this.albumMap = await this.storageService.getAlbums() || {};
+    } catch (e) {
+      console.error('Error loading albums:', e);
+    }
+  }
+
+  async createAlbumPrompt(): Promise<void> {
+    const alert = document.createElement('ion-alert');
+    alert.header = 'New Album';
+    alert.inputs = [{ name: 'name', type: 'text', placeholder: 'Album name' }];
+    alert.buttons = [
+      { text: 'Cancel', role: 'cancel' },
+      {
+        text: 'Create',
+        handler: async (data) => {
+          const name = data.name.trim();
+          if (name && !this.albumMap[name]) {
+            this.albumMap[name] = [];
+            await this.storageService.setAlbums(this.albumMap);
+          }
+        }
+      }
+    ];
+    document.body.appendChild(alert);
+    await alert.present();
+  }
+
+  async addTrackToAlbum(track: Track): Promise<void> {
+    const alert = document.createElement('ion-alert');
+    alert.header = 'Select Album';
+    alert.inputs = Object.keys(this.albumMap).map(name => ({
+      type: 'radio',
+      label: name,
+      value: name
+    }));
+    alert.buttons = [
+      { text: 'Cancel', role: 'cancel' },
+      {
+        text: 'Add',
+        handler: async (albumName) => {
+          if (!this.albumMap[albumName].some(t => t.fileUrl === track.fileUrl)) {
+            this.albumMap[albumName].unshift(track);
+            await this.storageService.setAlbums(this.albumMap);
+          }
+        }
+      }
+    ];
+    document.body.appendChild(alert);
+    await alert.present();
+  }
+
+  toggleAlbumVisibility(name: string): void {
+    if (this.visibleAlbums.has(name)) {
+      this.visibleAlbums.delete(name);
+    } else {
+      this.visibleAlbums.add(name);
+    }
+  }
+  
+  async renameAlbum(oldName: string): Promise<void> {
+    const alert = document.createElement('ion-alert');
+    alert.header = 'Rename Album';
+    alert.inputs = [{ name: 'name', type: 'text', value: oldName }];
+    alert.buttons = [
+      { text: 'Cancel', role: 'cancel' },
+      {
+        text: 'Rename',
+        handler: async (data) => {
+          const newName = data.name.trim();
+          if (newName && newName !== oldName && !this.albumMap[newName]) {
+            this.albumMap[newName] = this.albumMap[oldName];
+            delete this.albumMap[oldName];
+            if (this.visibleAlbums.has(oldName)) {
+              this.visibleAlbums.delete(oldName);
+              this.visibleAlbums.add(newName);
+            }
+            await this.storageService.setAlbums(this.albumMap);
+          }
+        }
+      }
+    ];
+    document.body.appendChild(alert);
+    await alert.present();
+  }
+
+  async deleteAlbum(name: string): Promise<void> {
+    delete this.albumMap[name];
+    this.visibleAlbums.delete(name);
+    await this.storageService.setAlbums(this.albumMap);
+  }
+  
   triggerFileInput(): void {
     if (Capacitor.getPlatform() === 'web') {
       (document.getElementById('fileInput') as HTMLInputElement)?.click();

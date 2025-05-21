@@ -36,4 +36,12 @@ export class StorageService {
   async setUploadedTracks(data: Track[]): Promise<void> {
     await this.storage.set('uploadedTracks', data);
   }
+
+  async getAlbums(): Promise<{ [album: string]: Track[] }> {
+    return (await this.storage.get('albums')) || {};
+  }
+
+  async setAlbums(albums: { [album: string]: Track[] }): Promise<void> {
+    await this.storage.set('albums', albums);
+  }
 }
