@@ -321,11 +321,18 @@ export class HomePage implements OnDestroy {
   async deleteUploadedTrack(index: number): Promise<void> {
     const track = this.uploadedTracks[index];
     this.uploadedTracks.splice(index, 1);
-    await this.storageService.setUploadedTracks(this.uploadedTracks);
+    await this.storageService.setUploadedTracks(this.uploadedTracks);   
     this.playlist = this.playlist.filter(t => t.fileUrl !== track.fileUrl);
     await this.storageService.setPlaylists(this.playlist);
+    
+    for (const albumName of Object.keys(this.albumMap)) {
+      this.albumMap[albumName] = this.albumMap[albumName].filter(t => t.fileUrl !== track.fileUrl);
+    }
+    await this.storageService.setAlbums(this.albumMap);
+    if (this.currentTrack?.fileUrl === track.fileUrl) {
+      this.stopAndClosePlayer();
+   }
   }
-
   toggleExpand(): void {
     this.isExpanded = !this.isExpanded;
   }
